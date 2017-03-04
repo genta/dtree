@@ -1,0 +1,133 @@
+#!/usr/bin/env perl
+# dtree -- show file list with hash digest of each file.
+#
+# Copyright (c) 2017 Genta IHA <genta@teeda.jp>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+
+use v5.10.1;
+use strict;
+use warnings;
+use utf8;
+use encoding::warnings 'FATAL';
+use File::Find qw(find);
+use Digest::MD5;
+use Getopt::Long qw(:config posix_default no_ignore_case gnu_compat);
+
+our @opt_excludes = ();
+GetOptions(
+    'exclude|X=s' => \@opt_excludes,
+);
+our $digest = Digest::MD5->new();
+
+sub get_hex_digest {
+    my ($path) = @_;
+    $digest->reset;
+
+    open(my $fh, '<', $path) or die "open: $path: $!";
+    my $hex_digest = $digest->addfile($fh)->hexdigest;
+    close($fh);
+
+    return $hex_digest;
+}
+
+sub devno {
+    return(join(':', $_[0] % 256, int($_[0] / 256)));
+}
+
+sub proc_file {
+    my ($path) = @_;
+    my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size) = lstat($path)
+        or die "stat: $path: $!";
+
+    my $size_field;
+    my $perm = $mode & 04777;
+    my $uname = getpwuid($uid) || $uid;
+    my $gname = getgrgid($gid) || $gid;
+    my $ugname = $uname . ' ' . $gname;
+
+    my $ident = '';
+
+    if (-f _) {
+        $ident = get_hex_digest($path);
+    } elsif (-d _) {
+        $ident = '<dir>';
+        $size = 0;
+    } elsif (-l _) {
+        $ident = '<symlink>';
+        $size = 0;
+
+        my $link_dest = readlink($path) or die "readlink: $path: $!";
+        $path .= ' -> ' . $link_dest;
+    } elsif (-b _) {
+        $ident = '<block>';
+        $size_field = devno($rdev);
+    } elsif (-c _) {
+        $ident = '<char>';
+        $size_field = devno($rdev);
+    } elsif (-p _) {
+        $ident = '<fifo>';
+    } elsif (-S _) {
+        $ident = '<sock>';
+    } else {
+        $ident = '<UNKNOWN>';
+    }
+
+    printf("%-32s %4o %-17s %13s %s\n",
+        $ident,
+        $perm,
+        $ugname,
+        $size_field // $size,
+        $path);
+}
+
+sub wanted {
+    my $path = $File::Find::name;
+
+    foreach my $re (@opt_excludes) {
+        return if ($path =~ /$re/);
+    }
+
+    proc_file($path);
+}
+
+sub sort_dir {
+    return sort @_;
+}
+
+my @dirlist = @ARGV;
+if ($#dirlist < 0) {
+    push(@dirlist, './');
+}
+
+foreach my $dir (@dirlist) {
+    find({
+        'wanted' => \&wanted,
+        'preprocess' => \&sort_dir,
+        'no_chdir' => 1,
+      },
+      $dir);
+}
+
+__END__
