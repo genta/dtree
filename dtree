@@ -32,15 +32,28 @@ use strict;
 use warnings;
 use utf8;
 use encoding::warnings 'FATAL';
+use File::Basename 'basename';
 use File::Find qw(find);
 use Digest::MD5;
 use Getopt::Long qw(:config posix_default no_ignore_case gnu_compat);
 
 our @opt_excludes = ();
-GetOptions(
-    'exclude|X=s' => \@opt_excludes,
-);
+our $opt_usage = 0;
 our $digest = Digest::MD5->new();
+
+sub usage {
+    my $progname = basename($0);
+
+    print <<_EOD_;
+Usage: ${progname} [options] <directory>...
+Options:
+    -e, --exclude   Exclude output under specified path.
+    -h, --help      Display usage.
+
+_EOD_
+
+    exit 1;
+}
 
 sub get_hex_digest {
     my ($path) = @_;
@@ -116,6 +129,13 @@ sub wanted {
 sub sort_dir {
     return sort @_;
 }
+
+GetOptions(
+    'exclude|X=s' => \@opt_excludes,
+    'help|h' => \$opt_usage,
+);
+
+usage() if $opt_usage;
 
 my @dirlist = @ARGV;
 if ($#dirlist < 0) {
