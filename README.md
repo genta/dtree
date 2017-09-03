@@ -31,3 +31,7 @@ $ install -m 755 dtree /usr/local/bin
 ## Dependency
 
 * Perl 5.10.1 or later
+
+## License
+
+The 2-Clause BSD License.
