@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+# vim: set et fenc=utf-8 ff=unix sw=4 ts=4 syntax=perl :
 # dtree -- show file list with hash digest of each file.
 #
 # Copyright (c) 2017 Genta IHA <genta@teeda.jp>
