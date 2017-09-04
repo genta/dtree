@@ -47,8 +47,8 @@ sub usage {
     print <<_EOD_;
 Usage: ${progname} [options] <directory>...
 Options:
-    -e, --exclude   Exclude output under specified path.
-    -h, --help      Display usage.
+    -X, --exclude=PATTERN       Exclude files matching PATTERN.
+    -h, --help                  Display usage.
 
 _EOD_
 
